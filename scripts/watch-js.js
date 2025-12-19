@@ -1,0 +1,34 @@
+const chokidar = require('chokidar');
+const { execSync } = require('child_process');
+const path = require('path');
+
+const srcDir = path.join(__dirname, '..', 'src');
+
+console.log('👀 Assistindo mudanças em JavaScript...\n');
+
+const watcher = chokidar.watch(`${srcDir}/**/script.js`, {
+  ignored: /node_modules/,
+  persistent: true
+});
+
+watcher
+  .on('change', (filePath) => {
+    const relativePath = path.relative(srcDir, filePath);
+    console.log(`🔄 ${relativePath} modificado`);
+    
+    try {
+      execSync('node scripts/build-js.js', { stdio: 'inherit' });
+    } catch (error) {
+      console.error('Erro ao minificar JavaScript');
+    }
+  })
+  .on('add', (filePath) => {
+    const relativePath = path.relative(srcDir, filePath);
+    console.log(`✨ ${relativePath} adicionado`);
+    
+    try {
+      execSync('node scripts/build-js.js', { stdio: 'inherit' });
+    } catch (error) {
+      console.error('Erro ao minificar JavaScript');
+    }
+  });
