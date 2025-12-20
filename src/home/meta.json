@@ -1,7 +1,7 @@
 {
   "title": "Samuel Caetité | Senior React & React Native Developer",
-  "description": "Senior Full-Stack Developer com 6 anos de experiência especializado em React e React Native. Construindo soluções escaláveis para empresas como iFood, CNN Brasil, Riachuelo e Vivo.",
-  "keywords": "react developer, react native developer, senior frontend developer, fullstack developer, typescript developer, next.js, node.js, vtex specialist",
+  "description": "Senior Full-Stack Developer com 6 anos de experiência especializado em React, React Native, TypeScript e VTEX. Desenvolvedor certificado com portfolio de projetos para grandes marcas.",
+  "keywords": "react developer, react native developer, senior frontend developer, typescript developer, vtex specialist, fullstack developer, javascript expert, mobile developer, web developer, samuel caetite",
   "author": "Samuel Caetité",
   "image": "/assets/og-image.jpg",
   "type": "website",
@@ -12,5 +12,38 @@
   "sitemap": {
     "priority": "1.0",
     "changefreq": "monthly"
+  },
+  "structuredData": {
+    "type": "Person",
+    "name": "Samuel Caetité",
+    "jobTitle": "Senior React & React Native Developer",
+    "description": "Senior Full-Stack Developer com 6 anos de experiência especializado em React, React Native, TypeScript e VTEX",
+    "image": "/assets/og-image.jpg",
+    "sameAs": [
+      "https://www.linkedin.com/in/samuelcaetite",
+      "https://github.com/osamucadev",
+      "https://samuelcaetite.dev"
+    ],
+    "knowsAbout": [
+      "React",
+      "React Native",
+      "TypeScript",
+      "Node.js",
+      "VTEX IO",
+      "JavaScript",
+      "HTML5",
+      "CSS3",
+      "SCSS",
+      "Git",
+      "Firebase",
+      "REST APIs",
+      "GraphQL"
+    ],
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "São Paulo",
+      "addressRegion": "SP",
+      "addressCountry": "BR"
+    }
   }
 }

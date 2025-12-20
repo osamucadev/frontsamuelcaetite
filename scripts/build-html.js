@@ -28,6 +28,87 @@ if (fs.existsSync(imageMapPath)) {
 
 const baseUrl = config.site?.url || "https://react.samuelcaetite.dev";
 
+// Template de Preconnect
+function getPreconnectLinks() {
+  return `
+  <!-- Preconnect - conecta com domínios externos ANTES de precisar -->
+  <link rel="preconnect" href="https://www.googletagmanager.com">
+  <link rel="preconnect" href="https://www.google-analytics.com">
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com">`;
+}
+
+// Template de Structured Data / JSON-LD
+function getStructuredData(meta, folder) {
+  if (!meta || !meta.structuredData) return "";
+
+  const sd = meta.structuredData;
+  const pageUrl = folder === "home" ? baseUrl : `${baseUrl}/${folder}`;
+
+  // Montar objeto base
+  const data = {
+    "@context": "https://schema.org",
+    "@type": sd.type,
+  };
+
+  // Adicionar campos específicos baseado no tipo
+  if (sd.type === "Person") {
+    Object.assign(data, {
+      name: sd.name,
+      jobTitle: sd.jobTitle,
+      description: sd.description || meta.description,
+      url: pageUrl,
+      image: sd.image
+        ? `${baseUrl}${sd.image}`
+        : meta.image
+        ? `${baseUrl}${meta.image}`
+        : undefined,
+      sameAs: sd.sameAs || [],
+      knowsAbout: sd.knowsAbout || [],
+      address: sd.address,
+    });
+  } else if (sd.type === "SoftwareApplication") {
+    Object.assign(data, {
+      name: sd.name,
+      applicationCategory: sd.applicationCategory,
+      description: sd.description || meta.description,
+      url: pageUrl,
+      operatingSystem: sd.operatingSystem || "Web Browser",
+      offers: sd.offers || {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "BRL",
+      },
+    });
+  } else if (sd.type === "WebPage") {
+    Object.assign(data, {
+      name: sd.name || meta.title,
+      description: sd.description || meta.description,
+      url: pageUrl,
+    });
+  } else if (sd.type === "FAQPage") {
+    Object.assign(data, {
+      mainEntity: sd.mainEntity || [],
+    });
+  } else {
+    // Para outros tipos, copia todos os campos
+    Object.assign(data, sd);
+    delete data.type; // Remove o "type" duplicado
+  }
+
+  // Remover campos undefined
+  Object.keys(data).forEach((key) => {
+    if (data[key] === undefined) {
+      delete data[key];
+    }
+  });
+
+  return `
+  <!-- Structured Data / JSON-LD -->
+  <script type="application/ld+json">
+${JSON.stringify(data, null, 2)}
+  </script>`;
+}
+
 // Template do Google Analytics
 function getGoogleAnalyticsScript(measurementId) {
   if (!measurementId) return "";
@@ -173,6 +254,7 @@ async function buildHtml() {
     .map((dirent) => dirent.name);
 
   let processedCount = 0;
+  let structuredDataCount = 0;
 
   for (const folder of folders) {
     const htmlPath = path.join(srcDir, folder, "index.html");
@@ -196,7 +278,13 @@ async function buildHtml() {
         const cssPathWithHash = hashMap[cssPath] || cssPath;
         const jsPathWithHash = hashMap[jsPath] || jsPath;
 
-        // 1. Injeta Google Analytics PRIMEIRO (se configurado)
+        // 0. Injeta Preconnect PRIMEIRO (Performance)
+        const preconnectLinks = getPreconnectLinks();
+        if (!html.includes('rel="preconnect"')) {
+          html = html.replace(/<head>/i, `<head>${preconnectLinks}`);
+        }
+
+        // 1. Injeta Google Analytics (se configurado)
         if (config.googleAnalytics && config.googleAnalytics.measurementId) {
           const gaScript = getGoogleAnalyticsScript(
             config.googleAnalytics.measurementId
@@ -238,6 +326,16 @@ async function buildHtml() {
 
         // 5. Substitui referências de imagens por versões otimizadas
         html = replaceImageReferences(html);
+
+        // 5.5 Injeta Structured Data / JSON-LD (SEO avançado)
+        if (meta && meta.structuredData) {
+          const jsonLD = getStructuredData(meta, folder);
+
+          if (!html.includes("application/ld+json")) {
+            html = html.replace("</head>", `${jsonLD}\n</head>`);
+            structuredDataCount++;
+          }
+        }
 
         // 6. Injeta CSS COM HASH (se existir)
         const cssExists = fs.existsSync(
@@ -303,6 +401,8 @@ async function buildHtml() {
   console.log(`✓ ${processedCount} arquivo(s) HTML processado(s)\n`);
 
   // Mensagens de confirmação
+  console.log(`⚡ Preconnect links injetados (Google Analytics)\n`);
+
   if (config.googleAnalytics && config.googleAnalytics.measurementId) {
     console.log(
       `📊 Google Analytics (${config.googleAnalytics.measurementId}) injetado\n`
@@ -317,6 +417,12 @@ async function buildHtml() {
 
   if (config.seo?.autoInject !== false) {
     console.log(`🔍 SEO Meta Tags (Open Graph + Twitter Card) injetados\n`);
+  }
+
+  if (structuredDataCount > 0) {
+    console.log(
+      `📋 Structured Data (JSON-LD) injetado em ${structuredDataCount} página(s)\n`
+    );
   }
 
   if (Object.keys(hashMap).length > 0) {
