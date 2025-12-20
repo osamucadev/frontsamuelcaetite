@@ -1,9 +1,19 @@
 {
+  "site": {
+    "url": "https://react.samuelcaetite.dev",
+    "name": "Samuel Caetité - React Developer",
+    "defaultImage": "/assets/images/og-default.jpg"
+  },
   "googleAnalytics": {
     "measurementId": "G-CQKYT6N0P0"
   },
   "favicons": {
     "enabled": true,
     "basePath": "/assets"
+  },
+  "seo": {
+    "autoInject": true,
+    "includeOpenGraph": true,
+    "includeTwitterCard": true
   }
 }

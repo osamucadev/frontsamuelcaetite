@@ -1,0 +1,16 @@
+{
+  "title": "Samuel Caetité | Senior React & React Native Developer",
+  "description": "Senior Full-Stack Developer com 6 anos de experiência especializado em React e React Native. Construindo soluções escaláveis para empresas como iFood, CNN Brasil, Riachuelo e Vivo.",
+  "keywords": "react developer, react native developer, senior frontend developer, fullstack developer, typescript developer, next.js, node.js, vtex specialist",
+  "author": "Samuel Caetité",
+  "image": "/assets/images/og-image.jpg",
+  "type": "website",
+  "locale": "pt_BR",
+  "siteName": "Samuel Caetité - React Developer",
+  "twitterCard": "summary_large_image",
+  "twitterCreator": "@samuelcaetite",
+  "sitemap": {
+    "priority": "1.0",
+    "changefreq": "monthly"
+  }
+}

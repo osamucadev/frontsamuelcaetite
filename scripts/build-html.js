@@ -12,6 +12,8 @@ if (fs.existsSync(configPath)) {
   config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 }
 
+const baseUrl = config.site?.url || "https://react.samuelcaetite.dev";
+
 // Template do Google Analytics
 function getGoogleAnalyticsScript(measurementId) {
   if (!measurementId) return "";
@@ -40,6 +42,67 @@ function getFaviconsLinks(basePath = "/assets") {
   <meta name="theme-color" content="#3b82f6">`;
 }
 
+// Template de SEO Meta Tags
+function getSEOMetaTags(meta, folder) {
+  if (!meta) return "";
+
+  const pageUrl = folder === "home" ? baseUrl : `${baseUrl}/${folder}`;
+  const imageUrl = meta.image
+    ? `${baseUrl}${meta.image}`
+    : `${baseUrl}${
+        config.site?.defaultImage || "/assets/images/og-default.jpg"
+      }`;
+
+  let metaTags = `
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="${meta.description || ""}">
+  <meta name="keywords" content="${meta.keywords || ""}">
+  <meta name="author" content="${meta.author || config.site?.name || ""}">`;
+
+  // Open Graph
+  if (config.seo?.includeOpenGraph !== false) {
+    metaTags += `
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="${meta.type || "website"}">
+  <meta property="og:url" content="${pageUrl}/">
+  <meta property="og:title" content="${meta.title || ""}">
+  <meta property="og:description" content="${meta.description || ""}">
+  <meta property="og:image" content="${imageUrl}">
+  <meta property="og:site_name" content="${
+    meta.siteName || config.site?.name || ""
+  }">
+  <meta property="og:locale" content="${meta.locale || "pt_BR"}">`;
+  }
+
+  // Twitter Card
+  if (config.seo?.includeTwitterCard !== false) {
+    metaTags += `
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="${
+    meta.twitterCard || "summary_large_image"
+  }">
+  <meta name="twitter:url" content="${pageUrl}/">
+  <meta name="twitter:title" content="${meta.title || ""}">
+  <meta name="twitter:description" content="${meta.description || ""}">
+  <meta name="twitter:image" content="${imageUrl}">`;
+
+    if (meta.twitterCreator) {
+      metaTags += `
+  <meta name="twitter:creator" content="${meta.twitterCreator}">`;
+    }
+  }
+
+  // Canonical URL
+  metaTags += `
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href="${pageUrl}/">`;
+
+  return metaTags;
+}
+
 async function buildHtml() {
   console.log("📄 Processando HTML...");
 
@@ -53,40 +116,67 @@ async function buildHtml() {
 
   for (const folder of folders) {
     const htmlPath = path.join(srcDir, folder, "index.html");
+    const metaPath = path.join(srcDir, folder, "meta.json");
 
     if (fs.existsSync(htmlPath)) {
       try {
         let html = fs.readFileSync(htmlPath, "utf-8");
 
+        // Carregar meta.json se existir
+        let meta = null;
+        if (fs.existsSync(metaPath)) {
+          meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        }
+
         // Define os caminhos dos assets baseado na pasta
         const cssPath = `/css/${folder}.min.css`;
         const jsPath = `/js/${folder}.min.js`;
 
-        // Injeta Google Analytics PRIMEIRO (se configurado)
+        // 1. Injeta Google Analytics PRIMEIRO (se configurado)
         if (config.googleAnalytics && config.googleAnalytics.measurementId) {
           const gaScript = getGoogleAnalyticsScript(
             config.googleAnalytics.measurementId
           );
 
-          // Injeta logo após <head> (antes de tudo)
           if (!html.includes("googletagmanager.com/gtag/js")) {
             html = html.replace(/<head>/i, `<head>${gaScript}`);
           }
         }
 
-        // Injeta Favicons DEPOIS do GA (se configurado)
+        // 2. Injeta/Atualiza o <title> (se tiver meta.json)
+        if (meta && meta.title) {
+          // Remove title existente
+          html = html.replace(/<title>.*?<\/title>/i, "");
+
+          // Adiciona novo title após GA
+          html = html.replace(
+            /<head>/i,
+            `<head>\n  <title>${meta.title}</title>`
+          );
+        }
+
+        // 3. Injeta SEO Meta Tags (se configurado e tiver meta.json)
+        if (config.seo?.autoInject !== false && meta) {
+          const seoTags = getSEOMetaTags(meta, folder);
+
+          // Injeta após o title
+          if (!html.includes("og:title")) {
+            html = html.replace(/<\/title>/i, `</title>${seoTags}`);
+          }
+        }
+
+        // 4. Injeta Favicons (se configurado)
         if (config.favicons && config.favicons.enabled) {
           const faviconsLinks = getFaviconsLinks(
             config.favicons.basePath || "/assets"
           );
 
-          // Injeta após o GA mas antes do </head>
           if (!html.includes("favicon.ico")) {
             html = html.replace("</head>", `${faviconsLinks}\n</head>`);
           }
         }
 
-        // Injeta CSS (se existir)
+        // 5. Injeta CSS (se existir)
         const cssExists = fs.existsSync(
           path.join(srcDir, folder, "styles.scss")
         );
@@ -97,7 +187,7 @@ async function buildHtml() {
           );
         }
 
-        // Injeta JS antes do </body> (se existir)
+        // 6. Injeta JS antes do </body> (se existir)
         const jsExists = fs.existsSync(path.join(srcDir, folder, "script.js"));
         if (jsExists && !html.includes(jsPath)) {
           html = html.replace(
@@ -133,7 +223,8 @@ async function buildHtml() {
         processedCount++;
         const outputName =
           folder === "home" ? "index.html" : `${folder}/index.html`;
-        console.log(`  ✓ ${folder}/index.html → ${outputName}`);
+        const hasMeta = meta ? "+ SEO" : "";
+        console.log(`  ✓ ${folder}/index.html → ${outputName} ${hasMeta}`);
       } catch (error) {
         console.error(
           `  ✗ Erro ao processar ${folder}/index.html:`,
@@ -156,6 +247,10 @@ async function buildHtml() {
     console.log(
       `🎨 Favicons injetados automaticamente (${config.favicons.basePath})\n`
     );
+  }
+
+  if (config.seo?.autoInject !== false) {
+    console.log(`🔍 SEO Meta Tags (Open Graph + Twitter Card) injetados\n`);
   }
 }
 
