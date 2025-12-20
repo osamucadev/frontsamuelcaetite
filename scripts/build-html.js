@@ -373,6 +373,9 @@ async function buildHtml() {
         let outputPath;
         if (folder === "home") {
           outputPath = path.join(publicDir, "index.html");
+        } else if (folder === "404") {
+          // Página 404 fica na raiz: public/404.html
+          outputPath = path.join(publicDir, "404.html");
         } else {
           const outputDir = path.join(publicDir, folder);
           fs.mkdirSync(outputDir, { recursive: true });
@@ -383,7 +386,11 @@ async function buildHtml() {
 
         processedCount++;
         const outputName =
-          folder === "home" ? "index.html" : `${folder}/index.html`;
+          folder === "home"
+            ? "index.html"
+            : folder === "404"
+            ? "404.html"
+            : `${folder}/index.html`;
         const hasMeta = meta ? "+ SEO" : "";
         const hasHash = Object.keys(hashMap).length > 0 ? "+ Hash" : "";
         console.log(

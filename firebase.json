@@ -3,15 +3,8 @@
     "site": "reactsamuelcaetite",
     "public": "public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/404/index.html"
-      }
-    ],
-    "hosting": {
-      "cleanUrls": true
-    },
+    "cleanUrls": true,
+    "trailingSlash": false,
     "headers": [
       {
         "source": "**",
