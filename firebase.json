@@ -6,9 +6,12 @@
     "rewrites": [
       {
         "source": "**",
-        "destination": "/404.html"
+        "destination": "/404/index.html"
       }
     ],
+    "hosting": {
+      "cleanUrls": true
+    },
     "headers": [
       {
         "source": "**",
