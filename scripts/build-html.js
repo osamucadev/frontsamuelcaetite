@@ -5,11 +5,25 @@ const { minify } = require("html-minifier-terser");
 const srcDir = path.join(__dirname, "..", "src");
 const publicDir = path.join(__dirname, "..", "public");
 const configPath = path.join(__dirname, "..", "config.json");
+const hashMapPath = path.join(publicDir, "hash-map.json");
+const imageMapPath = path.join(publicDir, "image-map.json");
 
 // Carregar configuração
 let config = {};
 if (fs.existsSync(configPath)) {
   config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+}
+
+// Carregar hash map (se existir)
+let hashMap = {};
+if (fs.existsSync(hashMapPath)) {
+  hashMap = JSON.parse(fs.readFileSync(hashMapPath, "utf-8"));
+}
+
+// Carregar image map (se existir)
+let imageMap = {};
+if (fs.existsSync(imageMapPath)) {
+  imageMap = JSON.parse(fs.readFileSync(imageMapPath, "utf-8"));
 }
 
 const baseUrl = config.site?.url || "https://react.samuelcaetite.dev";
@@ -103,6 +117,52 @@ function getSEOMetaTags(meta, folder) {
   return metaTags;
 }
 
+// Função para substituir referências de imagens por versões otimizadas
+function replaceImageReferences(html) {
+  let updatedHtml = html;
+
+  // Para cada imagem no mapa
+  for (const [originalPath, versions] of Object.entries(imageMap)) {
+    // Encontrar a versão WebP e a versão original otimizada
+    const webpVersion = versions.find((v) => v.type === "webp");
+    const originalOptimized = versions.find((v) => v.type !== "webp");
+
+    if (webpVersion && originalOptimized) {
+      // Substituir <img src="..."> por <picture> com WebP
+      const imgRegex = new RegExp(
+        `<img([^>]*?)src=["']${originalPath.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        )}["']([^>]*?)>`,
+        "gi"
+      );
+
+      updatedHtml = updatedHtml.replace(imgRegex, (match, before, after) => {
+        // Extrair alt, class, etc
+        const altMatch = match.match(/alt=["']([^"']*)["']/i);
+        const classMatch = match.match(/class=["']([^"']*)["']/i);
+        const alt = altMatch ? altMatch[1] : "";
+        const className = classMatch ? classMatch[1] : "";
+
+        return `<picture>
+  <source srcset="${webpVersion.url}" type="image/webp">
+  <img src="${originalOptimized.url}"${alt ? ` alt="${alt}"` : ""}${
+          className ? ` class="${className}"` : ""
+        }${before}${after}>
+</picture>`;
+      });
+    } else if (originalOptimized) {
+      // Se não tiver WebP, só substituir a URL
+      updatedHtml = updatedHtml.replace(
+        new RegExp(originalPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
+        originalOptimized.url
+      );
+    }
+  }
+
+  return updatedHtml;
+}
+
 async function buildHtml() {
   console.log("📄 Processando HTML...");
 
@@ -128,9 +188,13 @@ async function buildHtml() {
           meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
         }
 
-        // Define os caminhos dos assets baseado na pasta
+        // Define os caminhos dos assets (SEM hash ainda)
         const cssPath = `/css/${folder}.min.css`;
         const jsPath = `/js/${folder}.min.js`;
+
+        // Buscar versões com hash
+        const cssPathWithHash = hashMap[cssPath] || cssPath;
+        const jsPathWithHash = hashMap[jsPath] || jsPath;
 
         // 1. Injeta Google Analytics PRIMEIRO (se configurado)
         if (config.googleAnalytics && config.googleAnalytics.measurementId) {
@@ -145,10 +209,7 @@ async function buildHtml() {
 
         // 2. Injeta/Atualiza o <title> (se tiver meta.json)
         if (meta && meta.title) {
-          // Remove title existente
           html = html.replace(/<title>.*?<\/title>/i, "");
-
-          // Adiciona novo title após GA
           html = html.replace(
             /<head>/i,
             `<head>\n  <title>${meta.title}</title>`
@@ -159,7 +220,6 @@ async function buildHtml() {
         if (config.seo?.autoInject !== false && meta) {
           const seoTags = getSEOMetaTags(meta, folder);
 
-          // Injeta após o title
           if (!html.includes("og:title")) {
             html = html.replace(/<\/title>/i, `</title>${seoTags}`);
           }
@@ -176,23 +236,26 @@ async function buildHtml() {
           }
         }
 
-        // 5. Injeta CSS (se existir)
+        // 5. Substitui referências de imagens por versões otimizadas
+        html = replaceImageReferences(html);
+
+        // 6. Injeta CSS COM HASH (se existir)
         const cssExists = fs.existsSync(
           path.join(srcDir, folder, "styles.scss")
         );
-        if (cssExists && !html.includes(cssPath)) {
+        if (cssExists && !html.includes(cssPathWithHash)) {
           html = html.replace(
             "</head>",
-            `  <link rel="stylesheet" href="${cssPath}">\n</head>`
+            `  <link rel="stylesheet" href="${cssPathWithHash}">\n</head>`
           );
         }
 
-        // 6. Injeta JS antes do </body> (se existir)
+        // 7. Injeta JS COM HASH antes do </body> (se existir)
         const jsExists = fs.existsSync(path.join(srcDir, folder, "script.js"));
-        if (jsExists && !html.includes(jsPath)) {
+        if (jsExists && !html.includes(jsPathWithHash)) {
           html = html.replace(
             "</body>",
-            `  <script src="${jsPath}"></script>\n</body>`
+            `  <script src="${jsPathWithHash}"></script>\n</body>`
           );
         }
 
@@ -224,7 +287,10 @@ async function buildHtml() {
         const outputName =
           folder === "home" ? "index.html" : `${folder}/index.html`;
         const hasMeta = meta ? "+ SEO" : "";
-        console.log(`  ✓ ${folder}/index.html → ${outputName} ${hasMeta}`);
+        const hasHash = Object.keys(hashMap).length > 0 ? "+ Hash" : "";
+        console.log(
+          `  ✓ ${folder}/index.html → ${outputName} ${hasMeta} ${hasHash}`
+        );
       } catch (error) {
         console.error(
           `  ✗ Erro ao processar ${folder}/index.html:`,
@@ -251,6 +317,14 @@ async function buildHtml() {
 
   if (config.seo?.autoInject !== false) {
     console.log(`🔍 SEO Meta Tags (Open Graph + Twitter Card) injetados\n`);
+  }
+
+  if (Object.keys(hashMap).length > 0) {
+    console.log(`🔐 Assets com hash de cache injetados\n`);
+  }
+
+  if (Object.keys(imageMap).length > 0) {
+    console.log(`🖼️  Imagens otimizadas (WebP) injetadas\n`);
   }
 }
 
